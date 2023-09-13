@@ -1,2 +1,3 @@
 *.jack
 /testing_folder/
+*.xml
