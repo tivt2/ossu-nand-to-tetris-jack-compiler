@@ -8,13 +8,13 @@ type Token struct {
 }
 
 const (
-	ILLEGAL      = "ILLEGAL"
-	EOF          = "EOF"
-	KEYWORD      = "KEYWORD"
-	SYMBOL       = "SYMBOL"
-	IDENTIFIER   = "IDENTIFIER"
-	INT_CONST    = "INT_CONST"
-	STRING_CONST = "STRING_CONST"
+	ILLEGAL      = "illegal"
+	EOF          = "eof"
+	KEYWORD      = "keyword"
+	SYMBOL       = "symbol"
+	IDENTIFIER   = "identifier"
+	INT_CONST    = "integerConstant"
+	STRING_CONST = "stringConstant"
 )
 
 var Symbols = map[byte]bool{

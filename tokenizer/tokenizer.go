@@ -16,13 +16,13 @@ type Tokenizer struct {
 	position     int
 	nextPosition int
 	ch           byte
-	currToken    token.Token
+	CurrToken    token.Token
 }
 
 func removeComments(text string) string {
 	regexes := []string{
 		`\/\*[^*]*\*\/`,
-		`\/\*\*[^*]*\*\/`,
+		`\/\*\*[\s\S]*?\*\/`,
 		`\/\/[^\n]*`,
 	}
 
@@ -31,6 +31,7 @@ func removeComments(text string) string {
 		text = regex.ReplaceAllString(text, "")
 	}
 
+	// fmt.Println(text)
 	return text
 }
 
@@ -38,7 +39,7 @@ func New(filePath string) *Tokenizer {
 	file, err := os.ReadFile(filePath)
 	checkErr(err, fmt.Sprintf("Error when opening file %s", filePath))
 
-	fileContent := removeComments(string(file))
+	fileContent := removeComments(strings.TrimSpace(string(file)))
 
 	tkzr := &Tokenizer{
 		input:        fileContent,
@@ -57,49 +58,49 @@ func (tkzr *Tokenizer) HasMoreTokens() bool {
 func (tkzr *Tokenizer) Advance() {
 	if tkzr.HasMoreTokens() {
 		tkzr.nextChar()
-		tkzr.currToken = tkzr.tokenize()
+		tkzr.CurrToken = tkzr.tokenize()
 	} else {
-		tkzr.currToken = token.Token{Type: token.EOF, Literal: ""}
+		tkzr.CurrToken = token.Token{Type: token.EOF, Literal: ""}
 	}
 }
 
 func (tkzr *Tokenizer) TokenType() token.TokenType {
-	return tkzr.currToken.Type
+	return tkzr.CurrToken.Type
 }
 
 func (tkzr *Tokenizer) KeyWord() (string, bool) {
-	if tkzr.currToken.Type == token.KEYWORD {
-		return strings.ToUpper(tkzr.currToken.Literal), true
+	if tkzr.CurrToken.Type == token.KEYWORD {
+		return strings.ToUpper(tkzr.CurrToken.Literal), true
 	}
 	return "", false
 }
 
 func (tkzr *Tokenizer) Symbol() (string, bool) {
-	if tkzr.currToken.Type == token.SYMBOL {
-		return tkzr.currToken.Literal, true
+	if tkzr.CurrToken.Type == token.SYMBOL {
+		return tkzr.CurrToken.Literal, true
 	}
 	return "", false
 }
 
 func (tkzr *Tokenizer) Identifier() (string, bool) {
-	if tkzr.currToken.Type == token.IDENTIFIER {
-		return tkzr.currToken.Literal, true
+	if tkzr.CurrToken.Type == token.IDENTIFIER {
+		return tkzr.CurrToken.Literal, true
 	}
 	return "", false
 }
 
 func (tkzr *Tokenizer) IntVal() (int, bool) {
-	if tkzr.currToken.Type == token.INT_CONST {
-		val, err := strconv.Atoi(tkzr.currToken.Literal)
-		checkErr(err, fmt.Sprintf("Error trying to parse %s to integer", tkzr.currToken.Literal))
+	if tkzr.CurrToken.Type == token.INT_CONST {
+		val, err := strconv.Atoi(tkzr.CurrToken.Literal)
+		checkErr(err, fmt.Sprintf("Error trying to parse %s to integer", tkzr.CurrToken.Literal))
 		return val, true
 	}
 	return 0, false
 }
 
 func (tkzr *Tokenizer) StringVal() (string, bool) {
-	if tkzr.currToken.Type == token.STRING_CONST {
-		return tkzr.currToken.Literal, true
+	if tkzr.CurrToken.Type == token.STRING_CONST {
+		return tkzr.CurrToken.Literal, true
 	}
 	return "", false
 }
@@ -113,11 +114,20 @@ func (tkzr *Tokenizer) nextChar() {
 }
 
 func (tkzr *Tokenizer) tokenize() token.Token {
-	var out token.Token
 	tkzr.ignoreWhiteSpace()
+	var out token.Token
 
 	if _, ok := token.Symbols[tkzr.ch]; ok {
-		out = token.Token{Type: token.SYMBOL, Literal: string(tkzr.ch)}
+		switch tkzr.ch {
+		case '<':
+			out = token.Token{Type: token.SYMBOL, Literal: "&lt;"}
+		case '>':
+			out = token.Token{Type: token.SYMBOL, Literal: "&gt;"}
+		case '&':
+			out = token.Token{Type: token.SYMBOL, Literal: "&amp;"}
+		default:
+			out = token.Token{Type: token.SYMBOL, Literal: string(tkzr.ch)}
+		}
 	} else if isLetter(tkzr.ch) {
 		literal := tkzr.readWord()
 		if _, ok := token.Keywords[literal]; ok {
@@ -147,7 +157,7 @@ func (tkzr *Tokenizer) ignoreWhiteSpace() {
 	}
 }
 
-func (tkzr *Tokenizer) peekCh() byte {
+func (tkzr *Tokenizer) PeekCh() byte {
 	if len(tkzr.input) > tkzr.nextPosition {
 		return tkzr.input[tkzr.nextPosition]
 	}
@@ -156,7 +166,7 @@ func (tkzr *Tokenizer) peekCh() byte {
 
 func (tkzr *Tokenizer) readWord() string {
 	startPos := tkzr.position
-	for isLetter(tkzr.peekCh()) {
+	for isLetter(tkzr.PeekCh()) || isDigit(tkzr.PeekCh()) {
 		tkzr.nextChar()
 	}
 
@@ -165,7 +175,7 @@ func (tkzr *Tokenizer) readWord() string {
 
 func (tkzr *Tokenizer) readInteger() string {
 	startPos := tkzr.position
-	for isDigit(tkzr.peekCh()) {
+	for isDigit(tkzr.PeekCh()) {
 		tkzr.nextChar()
 	}
 
@@ -191,9 +201,9 @@ func isDigit(ch byte) bool {
 }
 
 func (tkzr *Tokenizer) Print() {
-	for tkzr.currToken.Type != token.EOF {
+	for tkzr.CurrToken.Type != token.EOF {
 		tkzr.Advance()
-		fmt.Println(tkzr.currToken)
+		fmt.Println(tkzr.CurrToken)
 	}
 }
 

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/tivt2/jack-compiler/tokenizer"
+	"github.com/tivt2/jack-compiler/syntax_analyzer"
 )
 
 func main() {
@@ -16,8 +16,7 @@ func main() {
 	path := os.Args[1]
 
 	if filepath.Ext(path) == ".jack" {
-		tkzr := tokenizer.New(path)
-		tkzr.Print()
+		syntax_analyzer.ParseXMLTree(path)
 		return
 	}
 
@@ -35,8 +34,7 @@ func main() {
 			if filepath.Ext(file) == ".jack" {
 				wg.Add(1)
 				go func() {
-					tkzr := tokenizer.New(filepath.Join(path, file))
-					tkzr.Print()
+					syntax_analyzer.ParseXMLTree(filepath.Join(path, file))
 					wg.Done()
 				}()
 			}
