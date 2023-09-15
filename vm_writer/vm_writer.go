@@ -9,55 +9,55 @@ import (
 	"github.com/tivt2/jack-compiler/vm_commands"
 )
 
-type vm_writer struct {
+type VMWriter struct {
 	outputPath string
 	vmCommands bytes.Buffer
 }
 
-func New(outputPath string) *vm_writer {
+func New(outputPath string, ext string) *VMWriter {
 
-	return &vm_writer{
-		outputPath: outputPath,
+	return &VMWriter{
+		outputPath: outputPath + ext,
 	}
 }
 
-func (w *vm_writer) WritePush(segment vm_commands.Segment, index int) {
+func (w *VMWriter) WritePush(segment vm_commands.Segment, index int) {
 	w.vmCommands.WriteString(fmt.Sprintf("push %s %d", segment, index))
 }
 
-func (w *vm_writer) WritePop(segment vm_commands.Segment, index int) {
+func (w *VMWriter) WritePop(segment vm_commands.Segment, index int) {
 	w.vmCommands.WriteString(fmt.Sprintf("pop %s %d", segment, index))
 }
 
-func (w *vm_writer) WriteArithmetic(command vm_commands.Command) {
+func (w *VMWriter) WriteArithmetic(command vm_commands.Command) {
 	w.vmCommands.WriteString(string(command))
 }
 
-func (w *vm_writer) WriteLabel(label string) {
+func (w *VMWriter) WriteLabel(label string) {
 	w.vmCommands.WriteString(fmt.Sprintf("(%s)", label))
 }
 
-func (w *vm_writer) WriteGoto(label string) {
+func (w *VMWriter) WriteGoto(label string) {
 	w.vmCommands.WriteString(fmt.Sprintf("goto %s", label))
 }
 
-func (w *vm_writer) WriteIf(label string) {
+func (w *VMWriter) WriteIf(label string) {
 	w.vmCommands.WriteString(fmt.Sprintf("if-goto %s", label))
 }
 
-func (w *vm_writer) WriteCall(name string, nArgs int) {
+func (w *VMWriter) WriteCall(name string, nArgs int) {
 	w.vmCommands.WriteString(fmt.Sprintf("call %s %d", name, nArgs))
 }
 
-func (w *vm_writer) WriteFunction(label string) {
-	w.vmCommands.WriteString(fmt.Sprintf("(%s)", label))
+func (w *VMWriter) WriteFunction(label string, nVars int) {
+	w.vmCommands.WriteString(fmt.Sprintf("function %s %d", label, nVars))
 }
 
-func (w *vm_writer) WriteReturn() {
+func (w *VMWriter) WriteReturn() {
 	w.vmCommands.WriteString("return")
 }
 
-func (w *vm_writer) Close() {
+func (w *VMWriter) Close() {
 	file, err := os.Create(w.outputPath)
 	if err != nil {
 		log.Fatalf("Error when trying to create file: %s\n%v", w.outputPath, err)

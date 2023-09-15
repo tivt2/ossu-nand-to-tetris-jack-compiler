@@ -4,37 +4,46 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"regexp"
+	"strings"
 
+	"github.com/tivt2/jack-compiler/parse_tree"
 	"github.com/tivt2/jack-compiler/parser"
 	"github.com/tivt2/jack-compiler/tokenizer"
 )
 
-func ParseXMLTree(filePath string) {
-	tkzr := tokenizer.New(filePath)
+func ParseXMLTree(filePath string) *parse_tree.Class {
+	file, err := os.ReadFile(filePath)
+	checkErr(err, fmt.Sprintf("Error when opening file %s", filePath))
+
+	fileContent := removeComments(strings.TrimSpace(string(file)))
+
+	tkzr := tokenizer.New(fileContent)
 	parser := parser.New(tkzr)
 
-	ParseTree, TokensXML := parser.CompileClass()
+	parseTree := parser.ParseClass()
 
-	path := filePath[:len(filePath)-5]
-	writeToFile(path, ".xml", ParseTree)
-	writeToFile(path+"T", ".xml", TokensXML)
-	// fmt.Println(ParseTree)
-	// fmt.Println(TokensXML)
+	return parseTree
 }
 
-func writeToFile(filePath string, ext string, content string) {
-	path := filePath + ext
-	fmt.Println("Creating file ->", path, "<-")
+func removeComments(text string) string {
+	regexes := []string{
+		`\/\*[^*]*\*\/`,
+		`\/\*\*[\s\S]*?\*\/`,
+		`\/\/[^\n]*`,
+	}
 
-	file, err := os.Create(path)
-	checkErr(err, fmt.Sprintf("Error trying to create file: %s", path))
-	defer file.Close()
+	for _, pattern := range regexes {
+		regex := regexp.MustCompile(pattern)
+		text = regex.ReplaceAllString(text, "")
+	}
 
-	file.WriteString(content)
+	return text
 }
 
 func checkErr(err error, msg string) {
 	if err != nil {
-		log.Fatalf("%s:\n%v", msg, err)
+		log.Println(msg)
+		log.Fatal(err)
 	}
 }

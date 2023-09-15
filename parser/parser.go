@@ -1,10 +1,9 @@
 package parser
 
 import (
-	"bytes"
-	"fmt"
 	"log"
 
+	"github.com/tivt2/jack-compiler/parse_tree"
 	"github.com/tivt2/jack-compiler/token"
 	"github.com/tivt2/jack-compiler/tokenizer"
 )
@@ -12,432 +11,226 @@ import (
 type Parser struct {
 	tkzr *tokenizer.Tokenizer
 
-	TokensXML bytes.Buffer
-	ParseTree bytes.Buffer
+	curToken  token.Token
+	peekToken token.Token
 }
 
 func New(tkzr *tokenizer.Tokenizer) *Parser {
-	parser := &Parser{
-		tkzr: tkzr,
-	}
+	p := &Parser{tkzr: tkzr}
 
-	return parser
+	p.nextToken()
+	p.nextToken()
+
+	return p
 }
 
-func (p *Parser) CompileClass() (ParseTree string, TokensXML string) {
-	p.tkzr.Advance()
-	if p.tkzr.CurrToken.Literal != "class" {
-		log.Fatalf("Invalid jack class. received token: %v", p.tkzr.CurrToken)
-	}
-	p.writeRule("class")
-	p.TokensXML.WriteString("<tokens>\n")
-
-	p.eatKeywordOrSymbol("class")
-	p.eatIdentifier()
-	p.eatKeywordOrSymbol("{")
-
-	p.compileClassVarDec()
-
-	p.compileSubroutine()
-
-	p.eatKeywordOrSymbol("}")
-	p.writeRule("/class")
-	p.TokensXML.WriteString("</tokens>")
-	return p.ParseTree.String(), p.TokensXML.String()
+func (p *Parser) nextToken() {
+	p.curToken = p.peekToken
+	p.peekToken = p.tkzr.Advance()
 }
 
-func (p *Parser) compileClassVarDec() {
-	switch p.tkzr.CurrToken.Literal {
-	case "field":
-		p.writeRule("classVarDec")
-		p.eatKeywordOrSymbol("field")
-	case "static":
-		p.writeRule("classVarDec")
-		p.eatKeywordOrSymbol("static")
+func (p *Parser) ParseClass() *parse_tree.Class {
+	class := &parse_tree.Class{}
+	if !p.curTokenIs(token.CLASS) {
+		log.Fatal("Invalid class")
+	}
+	class.Token = p.curToken
+	if !p.expectPeek(token.IDENT) {
+		log.Fatal("Invalid class identifier")
+	}
+	class.Value = p.curToken.Literal
+	if !p.expectPeek(token.LBRACE) {
+		log.Fatal("Invalid class open brace")
+	}
+	p.nextToken()
+	class.ClassVarDecs = []parse_tree.Declaration{}
+
+	for p.curToken.Type == token.FIELD || p.curToken.Type == token.STATIC {
+		class.ClassVarDecs = p.parseClassVarDec(class.ClassVarDecs)
+		p.nextToken()
+	}
+
+	class.SubroutineDecs = []*parse_tree.SubroutineDec{}
+	for p.curToken.Type != token.RBRACE && p.curToken.Type != token.EOF {
+		class.SubroutineDecs = append(class.SubroutineDecs, p.parseSubroutineDec())
+		p.nextToken()
+	}
+
+	return class
+}
+
+func (p *Parser) parseClassVarDec(cvds []parse_tree.Declaration) []parse_tree.Declaration {
+	cvd := &parse_tree.ClassVarDec{}
+
+	switch p.curToken.Type {
+	case token.FIELD, token.STATIC:
+		cvd.Token = p.curToken
 	default:
-		return
+		log.Fatalf("Invalid class var dec, received: %v", p.curToken)
 	}
+	p.nextToken()
 
-	p.eatType()
-	p.eatIdentifier()
-
-	for p.tkzr.CurrToken.Literal == "," {
-		p.eatKeywordOrSymbol(",")
-		p.eatIdentifier()
-	}
-
-	p.eatKeywordOrSymbol(";")
-	p.writeRule("/classVarDec")
-	p.compileClassVarDec()
-}
-
-func (p *Parser) compileSubroutine() {
-	switch p.tkzr.CurrToken.Literal {
-	case "constructor":
-		p.writeRule("subroutineDec")
-		p.eatKeywordOrSymbol("constructor")
-	case "method":
-		p.writeRule("subroutineDec")
-		p.eatKeywordOrSymbol("method")
-	case "function":
-		p.writeRule("subroutineDec")
-		p.eatKeywordOrSymbol("function")
+	switch p.curToken.Type {
+	case token.CHAR, token.INT, token.BOOLEAN, token.IDENT:
+		cvd.DecType = p.curToken
 	default:
-		return
+		log.Fatalf("Invalid class var dec type, received: %v", p.curToken)
 	}
 
-	p.eatType()
-	p.eatIdentifier()
-	p.eatKeywordOrSymbol("(")
-	p.writeRule("parameterList")
-	p.compileParameterList()
-	p.writeRule("/parameterList")
-	p.eatKeywordOrSymbol(")")
-	p.writeRule("subroutineBody")
-	p.compileSubroutineBody()
-	p.writeRule("/subroutineBody")
-	p.writeRule("/subroutineDec")
+	if !p.expectPeek(token.IDENT) {
+		log.Fatalf("Invalid class var dec ident, received: %v", p.curToken)
+	}
 
-	p.compileSubroutine()
+	cvd.Name = &parse_tree.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	cvds = append(cvds, cvd)
+	p.nextToken()
+
+	for p.curToken.Type == token.COMMA {
+		if !p.expectPeek(token.IDENT) {
+			log.Fatalf("Invalid VarDec Identifier, received: %v", p.curToken)
+		}
+		newCvd := &parse_tree.ClassVarDec{
+			Token:   cvd.Token,
+			DecType: cvd.DecType,
+			Name:    &parse_tree.Identifier{Token: p.curToken, Value: p.curToken.Literal},
+		}
+		cvds = append(cvds, newCvd)
+		p.nextToken()
+	}
+
+	if p.curToken.Type != token.SEMICOLON {
+		log.Fatalf("Missing semicolon in %q", cvds)
+	}
+
+	return cvds
 }
 
-func (p *Parser) compileParameterList() {
-	if p.tkzr.CurrToken.Literal == ")" {
-		return
-	}
-	if p.tkzr.CurrToken.Literal == "," {
-		p.eatKeywordOrSymbol(",")
-	}
-	p.eatType()
-	p.eatIdentifier()
-	p.compileParameterList()
-}
+func (p *Parser) parseSubroutineDec() *parse_tree.SubroutineDec {
+	sd := &parse_tree.SubroutineDec{}
 
-func (p *Parser) compileSubroutineBody() {
-	p.eatKeywordOrSymbol("{")
-	p.compileVarDec()
-	p.writeRule("statements")
-	p.compileStatements()
-	p.writeRule("/statements")
-
-	p.eatKeywordOrSymbol("}")
-}
-
-func (p *Parser) compileVarDec() {
-	if p.tkzr.CurrToken.Literal != "var" {
-		return
-	}
-	p.writeRule("varDec")
-	p.eatKeywordOrSymbol("var")
-	p.eatType()
-	p.eatIdentifier()
-	for p.tkzr.CurrToken.Literal == "," {
-		p.eatKeywordOrSymbol(",")
-		p.eatIdentifier()
-	}
-	p.eatKeywordOrSymbol(";")
-	p.writeRule("/varDec")
-	p.compileVarDec()
-}
-
-func (p *Parser) compileStatements() {
-	switch p.tkzr.CurrToken.Literal {
-	case "let":
-		p.writeRule("letStatement")
-		p.compileLet()
-		p.writeRule("/letStatement")
-	case "if":
-		p.writeRule("ifStatement")
-		p.compileIf()
-		p.writeRule("/ifStatement")
-	case "while":
-		p.writeRule("whileStatement")
-		p.compileWhile()
-		p.writeRule("/whileStatement")
-	case "do":
-		p.writeRule("doStatement")
-		p.compileDo()
-		p.writeRule("/doStatement")
-	case "return":
-		p.writeRule("returnStatement")
-		p.compileReturn()
-		p.writeRule("/returnStatement")
+	switch p.curToken.Type {
+	case token.CONSTRUCTOR, token.METHOD, token.FUNCTION:
+		sd.Token = p.curToken
 	default:
-		return
+		log.Fatalf("Invalid subroutine dec, received: %v", p.curToken)
 	}
-	p.compileStatements()
-}
+	p.nextToken()
 
-func (p *Parser) compileLet() {
-	p.eatKeywordOrSymbol("let")
-	p.eatIdentifier()
-
-	switch p.tkzr.CurrToken.Literal {
-	case "[":
-		p.eatKeywordOrSymbol("[")
-		p.writeRule("expression")
-		p.compileExpression()
-		p.writeRule("/expression")
-		p.eatKeywordOrSymbol("]")
-	case ".":
-		p.eatKeywordOrSymbol(".")
-		p.writeRule("expression")
-		p.compileExpression()
-		p.writeRule("/expression")
+	switch p.curToken.Type {
+	case token.CHAR, token.INT, token.BOOLEAN, token.IDENT:
+		sd.DecType = p.curToken
+	default:
+		log.Fatalf("Invalid subroutine dec type, received: %v", p.curToken)
 	}
 
-	p.eatKeywordOrSymbol("=")
-	p.writeRule("expression")
-	p.compileExpression()
-	p.writeRule("/expression")
-	p.eatKeywordOrSymbol(";")
-}
-
-func (p *Parser) compileIf() {
-	p.eatKeywordOrSymbol("if")
-	p.eatKeywordOrSymbol("(")
-
-	p.writeRule("expression")
-	p.compileExpression()
-	p.writeRule("/expression")
-
-	p.eatKeywordOrSymbol(")")
-	p.eatKeywordOrSymbol("{")
-
-	p.writeRule("statements")
-	p.compileStatements()
-	p.writeRule("/statements")
-
-	p.eatKeywordOrSymbol("}")
-
-	if p.tkzr.CurrToken.Literal == "else" {
-		p.eatKeywordOrSymbol("else")
-		p.eatKeywordOrSymbol("{")
-
-		p.writeRule("statements")
-		p.compileStatements()
-		p.writeRule("/statements")
-
-		p.eatKeywordOrSymbol("}")
-	}
-}
-
-func (p *Parser) compileWhile() {
-	p.eatKeywordOrSymbol("while")
-	p.eatKeywordOrSymbol("(")
-
-	p.writeRule("expression")
-	p.compileExpression()
-	p.writeRule("/expression")
-
-	p.eatKeywordOrSymbol(")")
-	p.eatKeywordOrSymbol("{")
-
-	p.writeRule("statements")
-	p.compileStatements()
-	p.writeRule("/statements")
-
-	p.eatKeywordOrSymbol("}")
-}
-
-func (p *Parser) compileDo() {
-	p.eatKeywordOrSymbol("do")
-	p.eatIdentifier()
-
-	if p.tkzr.CurrToken.Literal == "[" {
-		p.eatKeywordOrSymbol("[")
-		p.writeRule("expression")
-		p.compileExpression()
-		p.writeRule("/expression")
-		p.eatKeywordOrSymbol("]")
+	if !p.expectPeek(token.IDENT) {
+		log.Fatalf("Invalid class var dec ident, received: %v", p.curToken)
 	}
 
-	if p.tkzr.CurrToken.Literal == "." {
-		p.eatKeywordOrSymbol(".")
-		p.eatIdentifier()
+	sd.Name = &parse_tree.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+	if !p.expectPeek(token.LPAREN) {
+		log.Fatalf("Invalid subroutine dec params, received: %v", p.curToken)
+	}
+	p.nextToken()
+
+	for p.curToken.Type != token.RPAREN {
+		sd.Params = append(sd.Params, p.parseParameter())
+		p.nextToken()
 	}
 
-	p.eatKeywordOrSymbol("(")
-	p.writeRule("expressionList")
-	p.compileExpressionList()
-	p.writeRule("expressionList")
-	p.eatKeywordOrSymbol(")")
-	p.eatKeywordOrSymbol(";")
+	sd.SubroutineBody = p.parseSubroutineBody()
+	return sd
 }
 
-func (p *Parser) compileReturn() {
-	p.eatKeywordOrSymbol("return")
+func (p *Parser) parseParameter() *parse_tree.Parameter {
+	param := &parse_tree.Parameter{}
 
-	if p.tkzr.CurrToken.Literal != ";" {
-		p.writeRule("expression")
-		p.compileExpression()
-		p.writeRule("/expression")
+	if p.curTokenIs(token.COMMA) {
+		p.nextToken()
 	}
 
-	p.eatKeywordOrSymbol(";")
-}
-
-func (p *Parser) compileExpression() {
-	p.writeRule("term")
-	p.compileTerm()
-	p.writeRule("/term")
-
-	switch p.tkzr.CurrToken.Literal {
-	case "+":
-		p.eatKeywordOrSymbol("+")
-	case "-":
-		p.eatKeywordOrSymbol("-")
-	case "*":
-		p.eatKeywordOrSymbol("*")
-	case "/":
-		p.eatKeywordOrSymbol("/")
-	case "~":
-		p.eatKeywordOrSymbol("~")
-	case "=":
-		p.eatKeywordOrSymbol("=")
-	case "&lt;":
-		p.eatKeywordOrSymbol("<")
-	case "&gt;":
-		p.eatKeywordOrSymbol(">")
-	case "&amp;":
-		p.eatKeywordOrSymbol("&")
-	case "|":
-		p.eatKeywordOrSymbol("|")
-	case ";":
-		return
-	case ")":
-		return
-	case "]":
-		return
-	case ",":
-		return
+	switch p.curToken.Type {
+	case token.CHAR, token.INT, token.BOOLEAN, token.IDENT:
+		param.DecType = p.curToken
+	default:
+		log.Fatalf("Invalid param dec type, received: %v", p.curToken)
 	}
 
-	p.writeRule("term")
-	p.compileTerm()
-	p.writeRule("/term")
+	if !p.expectPeek(token.IDENT) {
+		log.Fatalf("Invalid param identifier, received: %v", p.curToken)
+	}
+	param.Name = &parse_tree.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+	return param
 }
 
-func (p *Parser) compileTerm() {
-	// if p.tkzr.CurrToken.Literal == ";" {
-	// 	return
-	// }
+func (p *Parser) parseSubroutineBody() *parse_tree.SubroutineBody {
+	if !p.expectPeek(token.LBRACE) {
+		log.Fatalf("Invalid subroutinebody, received: %v", p.curToken)
+	}
+	p.nextToken()
+	sb := &parse_tree.SubroutineBody{}
 
-	switch p.tkzr.CurrToken.Type {
-	case token.INT_CONST:
-		p.eatConstant()
-	case token.STRING_CONST:
-		p.eatConstant()
-	case token.KEYWORD:
-		switch p.tkzr.CurrToken.Literal {
-		case "true":
-			p.eatKeywordOrSymbol("true")
-		case "false":
-			p.eatKeywordOrSymbol("false")
-		case "null":
-			p.eatKeywordOrSymbol("null")
-		case "this":
-			p.eatKeywordOrSymbol("this")
+	for p.curToken.Type == token.VAR {
+		sb.VarDecs = p.parseVarDec(sb.VarDecs)
+		p.nextToken()
+	}
+
+	return sb
+}
+
+func (p *Parser) parseVarDec(vds []parse_tree.Declaration) []parse_tree.Declaration {
+	vd := &parse_tree.VarDec{Token: p.curToken}
+	p.nextToken()
+
+	switch p.curToken.Type {
+	case token.CHAR, token.INT, token.BOOLEAN, token.IDENT:
+		vd.DecType = p.curToken
+	default:
+		log.Fatalf("Invalid VarDec DecType, received: %v", p.curToken)
+	}
+
+	if !p.expectPeek(token.IDENT) {
+		log.Fatalf("Invalid VarDec Identifier, received: %v", p.curToken)
+	}
+	vd.Name = &parse_tree.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	vds = append(vds, vd)
+	p.nextToken()
+
+	for p.curToken.Type == token.COMMA {
+		if !p.expectPeek(token.IDENT) {
+			log.Fatalf("Invalid VarDec Identifier, received: %v", p.curToken)
 		}
-	case token.SYMBOL:
-		switch p.tkzr.CurrToken.Literal {
-		case "-":
-			p.eatKeywordOrSymbol("-")
-			p.writeRule("term")
-			p.compileTerm()
-			p.writeRule("/term")
-		case "~":
-			p.eatKeywordOrSymbol("~")
-			p.writeRule("term")
-			p.compileTerm()
-			p.writeRule("/term")
-		case "(":
-			p.eatKeywordOrSymbol("(")
-			p.writeRule("expression")
-			p.compileExpression()
-			p.writeRule("/expression")
-			p.eatKeywordOrSymbol(")")
+		newVd := &parse_tree.VarDec{
+			Token:   vd.Token,
+			DecType: vd.DecType,
+			Name:    &parse_tree.Identifier{Token: p.curToken, Value: p.curToken.Literal},
 		}
-	case token.IDENTIFIER:
-		p.eatIdentifier()
-		switch p.tkzr.CurrToken.Literal {
-		case "[":
-			p.eatKeywordOrSymbol("[")
-			p.writeRule("expression")
-			p.compileExpression()
-			p.writeRule("/expression")
-			p.eatKeywordOrSymbol("]")
-		case "(":
-			p.eatKeywordOrSymbol("(")
-			p.writeRule("expressionList")
-			p.compileExpressionList()
-			p.writeRule("/expressionList")
-			p.eatKeywordOrSymbol(")")
-		case ".":
-			p.eatKeywordOrSymbol(".")
-			p.eatIdentifier()
-			p.eatKeywordOrSymbol("(")
-			p.writeRule("expressionList")
-			p.compileExpressionList()
-			p.writeRule("/expressionList")
-			p.eatKeywordOrSymbol(")")
-		}
+		vds = append(vds, newVd)
+		p.nextToken()
 	}
+
+	if p.curToken.Type != token.SEMICOLON {
+		log.Fatalf("Invalid VarDec semicolon, received: %q", p.curToken)
+	}
+
+	return vds
 }
 
-func (p *Parser) compileExpressionList() {
-	if p.tkzr.CurrToken.Literal == ")" {
-		return
-	}
-	if p.tkzr.CurrToken.Literal == "," {
-		p.eatKeywordOrSymbol(",")
-	}
-	p.writeRule("expression")
-	p.compileExpression()
-	p.writeRule("/expression")
-	p.compileExpressionList()
+func (p *Parser) curTokenIs(t token.TokenType) bool {
+	return p.curToken.Type == t
 }
 
-func (p *Parser) eatType() {
-	literal := p.tkzr.CurrToken.Literal
-	if p.tkzr.CurrToken.Type != token.IDENTIFIER && literal != "int" && literal != "char" && literal != "boolean" && literal != "void" {
-		log.Fatalf("Unexpected type, expected: %v. received: %v", token.IDENTIFIER, p.tkzr.CurrToken.Type)
+func (p *Parser) peekTokenIs(t token.TokenType) bool {
+	return p.peekToken.Type == t
+}
+
+func (p *Parser) expectPeek(t token.TokenType) bool {
+	if p.peekTokenIs(t) {
+		p.nextToken()
+		return true
+	} else {
+		return false
 	}
-	p.writeToken()
-	p.tkzr.Advance()
-}
-
-func (p *Parser) eatIdentifier() {
-	if p.tkzr.CurrToken.Type != token.IDENTIFIER {
-		log.Fatalf("Unexpected identifier, expected: %v. received: %v", token.IDENTIFIER, p.tkzr.CurrToken.Type)
-	}
-	p.writeToken()
-	p.tkzr.Advance()
-}
-
-func (p *Parser) eatKeywordOrSymbol(literal string) {
-	if p.tkzr.CurrToken.Type != token.KEYWORD && p.tkzr.CurrToken.Type != token.SYMBOL && p.tkzr.CurrToken.Literal != literal {
-		log.Fatalf("Unexpected token, expected: %v. received: %v", literal, p.tkzr.CurrToken.Literal)
-	}
-	p.writeToken()
-	p.tkzr.Advance()
-}
-
-func (p *Parser) eatConstant() {
-	if p.tkzr.CurrToken.Type != token.INT_CONST && p.tkzr.CurrToken.Type != token.STRING_CONST {
-		log.Fatalf("Unexpected token, expected: %v or %v. received: %v", token.INT_CONST, token.STRING_CONST, p.tkzr.CurrToken.Type)
-	}
-	p.writeToken()
-	p.tkzr.Advance()
-}
-
-func (p *Parser) writeRule(rule string) {
-	// fmt.Printf("<%v>\n", rule)
-	p.ParseTree.WriteString(fmt.Sprintf("<%s>\n", rule))
-}
-
-func (p *Parser) writeToken() {
-	// fmt.Printf("<%v> %v </%v>\n", p.tkzr.CurrToken.Type, p.tkzr.CurrToken.Literal, p.tkzr.CurrToken.Type)
-	p.ParseTree.WriteString(fmt.Sprintf("<%v> %v </%v>\n", p.tkzr.CurrToken.Type, p.tkzr.CurrToken.Literal, p.tkzr.CurrToken.Type))
-	p.TokensXML.WriteString(fmt.Sprintf("<%v> %v </%v>\n", p.tkzr.CurrToken.Type, p.tkzr.CurrToken.Literal, p.tkzr.CurrToken.Type))
 }

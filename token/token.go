@@ -1,5 +1,7 @@
 package token
 
+import "fmt"
+
 type TokenType string
 
 type Token struct {
@@ -8,57 +10,84 @@ type Token struct {
 }
 
 const (
-	ILLEGAL      = "illegal"
-	EOF          = "eof"
-	KEYWORD      = "keyword"
-	SYMBOL       = "symbol"
-	IDENTIFIER   = "identifier"
-	INT_CONST    = "integerConstant"
-	STRING_CONST = "stringConstant"
+	ILLEGAL = "illegal"
+	EOF     = "eof"
+
+	IDENT   = "ident"
+	INT     = "int"
+	CHAR    = "char"
+	BOOLEAN = "boolean"
+
+	ASSIGN    = "="
+	LBRACKET  = "["
+	RBRACKET  = "]"
+	LPAREN    = "("
+	RPAREN    = ")"
+	LBRACE    = "{"
+	RBRACE    = "}"
+	DOT       = "."
+	COMMA     = ","
+	SEMICOLON = ";"
+	PLUS      = "+"
+	MINUS     = "-"
+	ASTERISK  = "*"
+	FSLASH    = "/"
+	AMP       = "&"
+	BAR       = "|"
+	LT        = "<"
+	GT        = ">"
+	EQ        = "="
+	NOT       = "~"
+	QUOT      = `"`
+
+	CLASS       = "class"
+	CONSTRUCTOR = "constructor"
+	FUNCTION    = "function"
+	METHOD      = "method"
+	FIELD       = "field"
+	STATIC      = "static"
+	VAR         = "var"
+	VOID        = "void"
+	TRUE        = "true"
+	FALSE       = "false"
+	NULL        = "null"
+	THIS        = "this"
+	LET         = "let"
+	DO          = "do"
+	IF          = "if"
+	ELSE        = "else"
+	WHILE       = "while"
+	RETURN      = "return"
 )
 
-var Symbols = map[byte]bool{
-	'{': true,
-	'}': true,
-	'(': true,
-	')': true,
-	'[': true,
-	']': true,
-	'.': true,
-	',': true,
-	';': true,
-	'+': true,
-	'-': true,
-	'*': true,
-	'/': true,
-	'&': true,
-	'|': true,
-	'<': true,
-	'>': true,
-	'=': true,
-	'~': true,
+var keywords = map[string]TokenType{
+	"class":       CLASS,
+	"constructor": CONSTRUCTOR,
+	"function":    FUNCTION,
+	"method":      METHOD,
+	"field":       FIELD,
+	"static":      STATIC,
+	"var":         VAR,
+	"int":         INT,
+	"char":        CHAR,
+	"boolean":     BOOLEAN,
+	"void":        VOID,
+	"true":        TRUE,
+	"false":       FALSE,
+	"null":        NULL,
+	"this":        THIS,
+	"let":         LET,
+	"do":          DO,
+	"if":          IF,
+	"else":        ELSE,
+	"while":       WHILE,
+	"return":      RETURN,
 }
 
-var Keywords = map[string]bool{
-	"class":       true,
-	"constructor": true,
-	"function":    true,
-	"method":      true,
-	"field":       true,
-	"static":      true,
-	"var":         true,
-	"int":         true,
-	"char":        true,
-	"boolean":     true,
-	"void":        true,
-	"true":        true,
-	"false":       true,
-	"null":        true,
-	"this":        true,
-	"let":         true,
-	"do":          true,
-	"if":          true,
-	"else":        true,
-	"while":       true,
-	"return":      true,
+func LookupIdent(ident string) TokenType {
+	fmt.Println(ident)
+	if tk, ok := keywords[ident]; ok {
+		return tk
+	}
+	return IDENT
 }
