@@ -48,6 +48,179 @@ func (p *Parser) expectPeek(tokenType token.TokenType) bool {
 	}
 }
 
+func (p *Parser) ParseClass() *parse_tree.Class {
+	class := &parse_tree.Class{Token: p.curToken}
+	if !p.expectToken(token.CLASS) {
+		log.Fatalf("Invalid class keyword, received: %v", p.curToken)
+	}
+	class.Ident = &parse_tree.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	if !p.expectToken(token.IDENT) {
+		log.Fatalf("Invalid class identifier, received: %v", p.curToken)
+	}
+	if !p.expectToken(token.LBRACE) {
+		log.Fatalf("Invalid class, missing {, received: %v", p.curToken)
+	}
+	for p.curToken.Type == token.FIELD || p.curToken.Type == token.STATIC {
+		class.ClassVarDecs = p.parseClassVarDec(class.ClassVarDecs)
+		p.nextToken()
+	}
+
+	for p.curToken.Type != token.RBRACE {
+		class.SubroutineDecs = append(class.SubroutineDecs, p.parseSubroutineDec())
+		p.nextToken()
+	}
+	p.nextToken()
+
+	if !p.expectToken(token.EOF) {
+		log.Fatalf("Invalid class, aditional text after class closing brace")
+	}
+	return class
+}
+
+func (p *Parser) parseClassVarDec(cvds []parse_tree.Declaration) []parse_tree.Declaration {
+	cvd := &parse_tree.ClassVarDec{Kind: p.curToken}
+	p.nextToken()
+
+	switch p.curToken.Type {
+	case token.IDENT:
+		cvd.DecType = p.curToken
+	case token.INT, token.CHAR, token.BOOLEAN:
+		cvd.DecType = p.curToken
+	default:
+		log.Fatalf("Invalid class var dec type, received: %v", p.curToken)
+	}
+
+	if !p.expectPeek(token.IDENT) {
+		log.Fatalf("Invalid class var dec identifier, received: %v", p.peekToken)
+	}
+	cvd.Ident = &parse_tree.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	cvds = append(cvds, cvd)
+	p.nextToken()
+	for p.curToken.Type == token.COMMA {
+		p.nextToken()
+		newCvd := &parse_tree.ClassVarDec{
+			Kind:    cvd.Kind,
+			DecType: cvd.DecType,
+			Ident:   &parse_tree.Identifier{Token: p.curToken, Value: p.curToken.Literal},
+		}
+		cvds = append(cvds, newCvd)
+		p.expectPeek(token.COMMA)
+		p.expectPeek(token.SEMICOLON)
+	}
+
+	return cvds
+}
+
+func (p *Parser) parseSubroutineDec() *parse_tree.SubroutineDec {
+	sd := &parse_tree.SubroutineDec{}
+
+	switch p.curToken.Type {
+	case token.CONSTRUCTOR:
+		sd.Kind = p.curToken
+	case token.METHOD:
+		sd.Kind = p.curToken
+	case token.FUNCTION:
+		sd.Kind = p.curToken
+	default:
+		log.Fatalf("Invalid sub dec, missing kind, received: %v", p.curToken)
+	}
+	p.nextToken()
+
+	switch p.curToken.Type {
+	case token.IDENT:
+		sd.DecType = p.curToken
+	case token.INT, token.CHAR, token.VOID, token.BOOLEAN:
+		sd.DecType = p.curToken
+	default:
+		log.Fatalf("Invalid var dec type, received: %v", p.curToken)
+	}
+
+	if !p.expectPeek(token.IDENT) {
+		log.Fatalf("Invalid var dec identifier, received: %v", p.peekToken)
+	}
+	sd.Ident = &parse_tree.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	if !p.expectPeek(token.LPAREN) {
+		log.Fatalf("Invalid sub dec, missing (, received: %v", p.peekToken)
+	}
+	p.nextToken()
+
+	for p.curToken.Type != token.RPAREN {
+		p.expectToken(token.COMMA)
+		sd.Params = append(sd.Params, p.parseParam())
+		p.nextToken()
+	}
+	p.nextToken()
+
+	if !p.expectToken(token.LBRACE) {
+		log.Fatalf("Invalid sub dec, missing {, received: %v", p.curToken)
+	}
+
+	sd.SubroutineBody = p.parseSubroutineBody()
+	if p.curToken.Type != token.RBRACE {
+		log.Fatalf("Invalid sub dec, missing }, received: %v", p.curToken)
+	}
+
+	return sd
+}
+
+func (p *Parser) parseParam() *parse_tree.Param {
+	param := &parse_tree.Param{}
+	switch p.curToken.Type {
+	case token.IDENT:
+		param.DecType = p.curToken
+	case token.INT, token.CHAR, token.BOOLEAN:
+		param.DecType = p.curToken
+	default:
+		log.Fatalf("Invalid param dec type, received: %v", p.curToken)
+	}
+
+	if !p.expectPeek(token.IDENT) {
+		log.Fatalf("Invalid var dec identifier, received: %v", p.peekToken)
+	}
+	param.Ident = &parse_tree.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+
+	return param
+}
+
+func (p *Parser) parseSubroutineBody() *parse_tree.SubroutineBody {
+	sb := &parse_tree.SubroutineBody{}
+
+	for p.curToken.Type == token.VAR {
+		sb.VarDecs = append(sb.VarDecs, p.parseVarDec())
+		p.nextToken()
+	}
+
+	sb.Statements = p.parseStatements()
+	if p.curToken.Type != token.RBRACE {
+		log.Fatalf("Invalid sub body statements, missing }, received: %v", p.peekToken)
+	}
+
+	return sb
+}
+
+func (p *Parser) parseVarDec() parse_tree.Declaration {
+	vd := &parse_tree.VarDec{Token: p.curToken}
+	p.nextToken()
+
+	switch p.curToken.Type {
+	case token.IDENT:
+		vd.DecType = p.curToken
+	case token.INT, token.CHAR, token.BOOLEAN:
+		vd.DecType = p.curToken
+	default:
+		log.Fatalf("Invalid var dec type, received: %v", p.curToken)
+	}
+	if !p.expectPeek(token.IDENT) {
+		log.Fatalf("Invalid var dec identifier, received: %v", p.peekToken)
+	}
+	vd.Ident = &parse_tree.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	if !p.expectPeek(token.SEMICOLON) {
+		log.Fatalf("Invalid var dec, missing semicolon, received: %v", p.peekToken)
+	}
+
+	return vd
+}
+
 func (p *Parser) parseStatements() []parse_tree.Statement {
 	var stmts []parse_tree.Statement
 
@@ -99,7 +272,6 @@ func (p *Parser) parseLetStatement() *parse_tree.LetStatement {
 		log.Fatalf("Invalid let statement, missing semicolon, received: %v", p.curToken)
 	}
 
-	// p.nextToken()
 	return ls
 }
 
@@ -107,12 +279,14 @@ func (p *Parser) parseReturnStatement() *parse_tree.ReturnStatement {
 	rs := &parse_tree.ReturnStatement{Token: p.curToken}
 
 	p.nextToken()
+	if p.curToken.Type == token.SEMICOLON {
+		return rs
+	}
 	rs.Expression = p.parseExpression()
 	if !p.expectPeek(token.SEMICOLON) {
 		log.Fatalf("Invalid return statement, missing semicolon, received: %v", p.curToken)
 	}
 
-	// p.nextToken()
 	return rs
 }
 
@@ -125,7 +299,6 @@ func (p *Parser) parseDoStatement() *parse_tree.DoStatement {
 		log.Fatalf("Invalid do statement, missing semicolon, received: %v", p.curToken)
 	}
 
-	// p.nextToken()
 	return ds
 }
 
@@ -163,7 +336,6 @@ func (p *Parser) parseIfStatement() *parse_tree.IfStatement {
 		}
 	}
 
-	// p.nextToken()
 	return is
 }
 
@@ -190,7 +362,6 @@ func (p *Parser) parseWhileStatement() *parse_tree.WhileStatement {
 		log.Fatalf("Invalid while statement, missing }, received: %v", p.curToken)
 	}
 
-	// p.nextToken()
 	return is
 }
 

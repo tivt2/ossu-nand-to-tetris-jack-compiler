@@ -6,47 +6,132 @@ import (
 	"github.com/tivt2/jack-compiler/token"
 )
 
+type Node interface {
+	String() string
+}
+
 type Declaration interface {
+	Node
 	declarationNode()
 }
 
 type Class struct {
+	Token          token.Token
+	Ident          *Identifier
 	ClassVarDecs   []Declaration
 	SubroutineDecs []Declaration
 }
 
+func (c *Class) declarationNode() {}
+func (c *Class) String() string {
+	var out bytes.Buffer
+
+	out.WriteString(c.Token.Literal + " ")
+	out.WriteString(c.Ident.String() + " ")
+	out.WriteString("{\n")
+	for _, cvd := range c.ClassVarDecs {
+		out.WriteString(cvd.String() + "\n")
+	}
+	for _, sd := range c.SubroutineDecs {
+		out.WriteString(sd.String() + "\n")
+	}
+	out.WriteString("}")
+
+	return out.String()
+}
+
 type ClassVarDec struct {
-	Kind    string
-	DecType string
-	Name    string
+	Kind    token.Token
+	DecType token.Token
+	Ident   *Identifier
 }
 
 func (cvd *ClassVarDec) declarationNode() {}
+func (cvd *ClassVarDec) String() string {
+	var out bytes.Buffer
+
+	out.WriteString(cvd.Kind.Literal + " ")
+	out.WriteString(cvd.DecType.Literal + " ")
+	out.WriteString(cvd.Ident.String())
+	out.WriteString(";")
+
+	return out.String()
+}
 
 type SubroutineDec struct {
-	Kind           string
-	DecType        string
-	Name           string
+	Kind           token.Token
+	DecType        token.Token
+	Ident          *Identifier
 	Params         []Declaration
 	SubroutineBody *SubroutineBody
 }
 
 func (sd *SubroutineDec) declarationNode() {}
+func (sd *SubroutineDec) String() string {
+	var out bytes.Buffer
+
+	out.WriteString(sd.Kind.Literal + " ")
+	out.WriteString(sd.DecType.Literal + " ")
+	out.WriteString(sd.Ident.String())
+	out.WriteString("(")
+	for i, param := range sd.Params {
+		if i != 0 {
+			out.WriteString(", ")
+		}
+		out.WriteString(param.String())
+	}
+	out.WriteString(") ")
+	out.WriteString("{\n")
+	out.WriteString(sd.SubroutineBody.String())
+	out.WriteString("}")
+
+	return out.String()
+}
 
 type Param struct {
-	Kind    string
-	DecType string
-	Name    string
+	DecType token.Token
+	Ident   *Identifier
 }
 
 func (p *Param) declarationNode() {}
+func (p *Param) String() string   { return p.DecType.Literal + " " + p.Ident.String() }
 
 type SubroutineBody struct {
-	VarDecs []Declaration
-	// Statements []Statement
+	VarDecs    []Declaration
+	Statements []Statement
 }
 
 func (sb *SubroutineBody) declarationNode() {}
+func (sb *SubroutineBody) String() string {
+	var out bytes.Buffer
+
+	for _, vd := range sb.VarDecs {
+		out.WriteString(vd.String() + "\n")
+	}
+	for _, stmt := range sb.Statements {
+		out.WriteString(stmt.String() + "\n")
+	}
+
+	return out.String()
+}
+
+type VarDec struct {
+	Token   token.Token
+	DecType token.Token
+	Ident   *Identifier
+}
+
+func (vd *VarDec) declarationNode() {}
+func (vd *VarDec) String() string {
+	var out bytes.Buffer
+
+	out.WriteString(vd.Token.Literal + " ")
+	out.WriteString(vd.DecType.Literal + " ")
+	out.WriteString(vd.Ident.String())
+	out.WriteString(";")
+
+	return out.String()
+}
 
 // STATEMENTS HERE
 
@@ -83,8 +168,10 @@ func (rs *ReturnStatement) stmtNode() {}
 func (rs *ReturnStatement) String() string {
 	var out bytes.Buffer
 
-	out.WriteString(rs.Token.Literal + " ")
-	out.WriteString(rs.Expression.String())
+	out.WriteString(rs.Token.Literal)
+	if rs.Expression != nil {
+		out.WriteString(" " + rs.Expression.String())
+	}
 	out.WriteString(";")
 
 	return out.String()
@@ -119,14 +206,14 @@ func (is *IfStatement) String() string {
 
 	out.WriteString(is.Token.Literal + " ")
 	out.WriteString("(" + is.Expression.String() + ") ")
-	out.WriteString("{")
+	out.WriteString("{\n")
 	for _, stmt := range is.IfStmts {
-		out.WriteString(stmt.String())
+		out.WriteString(stmt.String() + "\n")
 	}
 	if len(is.Else) > 0 {
-		out.WriteString("} else {")
+		out.WriteString("} else {\n")
 		for _, stmt := range is.Else {
-			out.WriteString(stmt.String())
+			out.WriteString(stmt.String() + "\n")
 		}
 	}
 	out.WriteString("}")
@@ -146,9 +233,9 @@ func (ws *WhileStatement) String() string {
 
 	out.WriteString(ws.Token.Literal + " ")
 	out.WriteString("(" + ws.Expression.String() + ") ")
-	out.WriteString("{")
+	out.WriteString("{\n")
 	for _, stmt := range ws.Stmts {
-		out.WriteString(stmt.String())
+		out.WriteString(stmt.String() + "\n")
 	}
 	out.WriteString("}")
 
@@ -156,10 +243,6 @@ func (ws *WhileStatement) String() string {
 }
 
 // STATEMENTS HERE
-
-type Node interface {
-	String() string
-}
 
 type Expression interface {
 	Node
