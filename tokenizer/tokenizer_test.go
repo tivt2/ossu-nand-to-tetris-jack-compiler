@@ -17,7 +17,8 @@ func TestAdvance(t *testing.T) {
 			do Output.println(s);
 			return this;
 		}
-		+-~*/[]void method function &|<>"true false null if else while
+		+-~*/[]void method function &|<>true false null if else while
+		"testing"
 	}
 	`
 
@@ -51,7 +52,7 @@ func TestAdvance(t *testing.T) {
 
 		{token.LET, "let"},
 		{token.IDENT, "x"},
-		{token.EQ, "="},
+		{token.ASSIGN, "="},
 		{token.IDENT, "ax"},
 		{token.SEMICOLON, ";"},
 		{token.DO, "do"},
@@ -82,7 +83,6 @@ func TestAdvance(t *testing.T) {
 		{token.BAR, "|"},
 		{token.LT, "<"},
 		{token.GT, ">"},
-		{token.QUOT, `"`},
 		{token.TRUE, "true"},
 		{token.FALSE, "false"},
 		{token.NULL, "null"},
@@ -90,6 +90,7 @@ func TestAdvance(t *testing.T) {
 		{token.ELSE, "else"},
 		{token.WHILE, "while"},
 
+		{token.QUOT, "testing"},
 		{token.RBRACE, "}"},
 	}
 

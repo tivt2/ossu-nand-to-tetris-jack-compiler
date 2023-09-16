@@ -1,8 +1,6 @@
 package tokenizer
 
 import (
-	"log"
-
 	"github.com/tivt2/jack-compiler/token"
 )
 
@@ -36,7 +34,7 @@ func (tkzr *Tokenizer) Advance() token.Token {
 
 	switch tkzr.ch {
 	case '=':
-		out = newToken(token.EQ, tkzr.ch)
+		out = newToken(token.ASSIGN, tkzr.ch)
 	case '[':
 		out = newToken(token.LBRACKET, tkzr.ch)
 	case ']':
@@ -74,7 +72,11 @@ func (tkzr *Tokenizer) Advance() token.Token {
 	case '~':
 		out = newToken(token.NOT, tkzr.ch)
 	case '"':
-		out = newToken(token.QUOT, tkzr.ch)
+		tkzr.readChar()
+		out.Literal = tkzr.readIdentifier()
+		out.Type = token.QUOT
+		tkzr.readChar()
+		return out
 	case 0:
 		out.Literal = ""
 		out.Type = token.EOF
@@ -128,10 +130,4 @@ func isLetter(ch byte) bool {
 
 func isDigit(ch byte) bool {
 	return '0' <= ch && ch <= '9'
-}
-
-func checkErr(err error, msg string) {
-	if err != nil {
-		log.Fatal(msg, err)
-	}
 }

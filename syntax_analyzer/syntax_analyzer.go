@@ -12,7 +12,7 @@ import (
 	"github.com/tivt2/jack-compiler/tokenizer"
 )
 
-func ParseXMLTree(filePath string) *parse_tree.Class {
+func ParseTree(filePath string) *parse_tree.Class {
 	file, err := os.ReadFile(filePath)
 	checkErr(err, fmt.Sprintf("Error when opening file %s", filePath))
 
