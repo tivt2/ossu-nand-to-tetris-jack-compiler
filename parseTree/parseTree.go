@@ -313,12 +313,10 @@ func (i *Identifier) String() string {
 
 	var out bytes.Buffer
 
-	out.WriteString(i.Value)
-	if i.Indexer != nil {
-		out.WriteString("[")
-		out.WriteString(i.Indexer.String())
-		out.WriteString("]")
-	}
+	out.WriteString(i.Token.Literal)
+	out.WriteString("[")
+	out.WriteString(i.Indexer.String())
+	out.WriteString("]")
 
 	return out.String()
 }

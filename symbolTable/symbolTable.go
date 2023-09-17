@@ -29,6 +29,8 @@ func New() *SymbolTable {
 
 func (sb *SymbolTable) Reset() {
 	sb.subroutineLevel = make(map[string]*tableRow)
+	sb.staticCounter = 0
+	sb.fieldCounter = 0
 	sb.argumentCounter = 0
 	sb.localCounter = 0
 }

@@ -108,29 +108,31 @@ func (jc *JackCompiler) CompileStatement(stmt parseTree.Statement) {
 		jc.CompileExpression(stmt.Expression)
 		jc.w.WritePop("temp", 0)
 	case *parseTree.WhileStatement:
-		jc.w.WriteLabel(fmt.Sprintf("WHILE%d", jc.whileCounter))
+		counter := jc.whileCounter
+		jc.whileCounter++
+		jc.w.WriteLabel(fmt.Sprintf("WHILE%d", counter))
 		jc.CompileExpression(stmt.Expression)
 		jc.w.WriteArithmetic(token.NOT)
-		jc.w.WriteIf(fmt.Sprintf("BREAK%d", jc.whileCounter))
+		jc.w.WriteIf(fmt.Sprintf("BREAK%d", counter))
 		jc.CompileStatements(stmt.Stmts)
-		jc.w.WriteGoto(fmt.Sprintf("WHILE%d", jc.whileCounter))
-		jc.w.WriteLabel(fmt.Sprintf("BREAK%d", jc.whileCounter))
-		jc.whileCounter++
+		jc.w.WriteGoto(fmt.Sprintf("WHILE%d", counter))
+		jc.w.WriteLabel(fmt.Sprintf("BREAK%d", counter))
 	case *parseTree.IfStatement:
 		elseLen := len(stmt.Else)
+		counter := jc.ifCounter
+		jc.ifCounter++
 		jc.CompileExpression(stmt.Expression)
 		jc.w.WriteArithmetic(token.NOT)
-		jc.w.WriteIf(fmt.Sprintf("ELSE%d", jc.ifCounter))
+		jc.w.WriteIf(fmt.Sprintf("ELSE%d", counter))
 		jc.CompileStatements(stmt.IfStmts)
 		if elseLen > 0 {
-			jc.w.WriteGoto(fmt.Sprintf("IF%d", jc.ifCounter))
+			jc.w.WriteGoto(fmt.Sprintf("IF%d", counter))
 		}
-		jc.w.WriteLabel(fmt.Sprintf("ELSE%d", jc.ifCounter))
+		jc.w.WriteLabel(fmt.Sprintf("ELSE%d", counter))
 		if elseLen > 0 {
 			jc.CompileStatements(stmt.Else)
-			jc.w.WriteLabel(fmt.Sprintf("IF%d", jc.ifCounter))
+			jc.w.WriteLabel(fmt.Sprintf("IF%d", counter))
 		}
-		jc.ifCounter++
 	}
 }
 
@@ -169,7 +171,7 @@ func (jc *JackCompiler) CompileExpression(exp parseTree.Expression) {
 		jc.w.WriteCall("String.new", 1)
 		for _, c := range exp.Value {
 			jc.w.WritePush("constant", int(c))
-			jc.w.WriteCall("String.appendChar", 1)
+			jc.w.WriteCall("String.appendChar", 2)
 		}
 	case *parseTree.KeywordConstant:
 		switch exp.Token.Type {
@@ -198,10 +200,11 @@ func (jc *JackCompiler) CompileExpression(exp parseTree.Expression) {
 				jc.w.WriteCall(fmt.Sprintf("%s.%s", exp.Ident.Value, exp.Subroutine.Value), len(exp.ExpList))
 			}
 		} else {
+			jc.w.WritePush("pointer", 0)
 			for _, e := range exp.ExpList {
 				jc.CompileExpression(e)
 			}
-			jc.w.WriteCall(fmt.Sprintf("%s.%s", jc.c.Ident.Value, exp.Subroutine.Value), len(exp.ExpList))
+			jc.w.WriteCall(fmt.Sprintf("%s.%s", jc.c.Ident.Value, exp.Subroutine.Value), len(exp.ExpList)+1)
 		}
 	}
 }

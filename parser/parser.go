@@ -404,19 +404,28 @@ func (p *Parser) parseTerm() parseTree.Expression {
 	case token.LPAREN:
 		p.nextToken()
 		exp := p.parseExpression()
-		if p.expectToken(token.RPAREN) {
+		if !p.expectPeek(token.RPAREN) {
 			log.Fatalf("Invalid group expression, missing ), received: %v", p.curToken)
 		}
-		p.nextToken()
 		return exp
 	case token.IDENT:
 		initIdent := p.curToken
-		index := p.checkForIndex()
-		if index != nil {
-			p.nextToken()
-		}
 
 		switch p.peekToken.Type {
+		case token.LBRACKET:
+			p.nextToken()
+			p.nextToken()
+
+			exp := p.parseExpression()
+
+			if !p.expectPeek(token.RBRACKET) {
+				log.Fatalf("Invalid index expression, missing ], received: %v", p.curToken)
+			}
+			return &parseTree.Identifier{
+				Token:   initIdent,
+				Value:   initIdent.Literal,
+				Indexer: exp,
+			}
 		case token.DOT:
 			p.nextToken()
 			if !p.expectPeek(token.IDENT) {
@@ -424,7 +433,7 @@ func (p *Parser) parseTerm() parseTree.Expression {
 			}
 			secondIdent := p.curToken
 			return &parseTree.SubroutineCall{
-				Ident:      &parseTree.Identifier{Token: initIdent, Value: initIdent.Literal, Indexer: index},
+				Ident:      &parseTree.Identifier{Token: initIdent, Value: initIdent.Literal, Indexer: nil},
 				Subroutine: &parseTree.Identifier{Token: secondIdent, Value: secondIdent.Literal, Indexer: nil},
 				ExpList:    p.parseExpressionList(),
 			}
@@ -435,24 +444,12 @@ func (p *Parser) parseTerm() parseTree.Expression {
 				ExpList:    p.parseExpressionList(),
 			}
 		default:
-			return &parseTree.Identifier{Token: initIdent, Value: initIdent.Literal, Indexer: index}
+			return &parseTree.Identifier{Token: initIdent, Value: initIdent.Literal, Indexer: nil}
 		}
 	default:
 		log.Fatalf("Invalid term received: %v", p.curToken)
 		return nil
 	}
-}
-
-func (p *Parser) checkForIndex() parseTree.Expression {
-	if !p.expectPeek(token.LBRACKET) {
-		return nil
-	}
-	p.nextToken()
-	exp := p.parseExpression()
-	if p.expectToken(token.RBRACKET) {
-		log.Fatalf("Invalid index expression, missing ], received: %v", p.curToken)
-	}
-	return exp
 }
 
 func (p *Parser) parseExpressionList() []parseTree.Expression {

@@ -73,7 +73,7 @@ func (tkzr *Tokenizer) Advance() token.Token {
 		out = newToken(token.NOT, tkzr.ch)
 	case '"':
 		tkzr.readChar()
-		out.Literal = tkzr.readIdentifier()
+		out.Literal = tkzr.readString()
 		out.Type = token.QUOT
 		tkzr.readChar()
 		return out
@@ -106,6 +106,14 @@ func (tkzr *Tokenizer) ignoreWithSpace() {
 
 func newToken(tokenType token.TokenType, ch byte) token.Token {
 	return token.Token{Type: tokenType, Literal: string(ch)}
+}
+
+func (tkzr *Tokenizer) readString() string {
+	position := tkzr.position
+	for tkzr.ch != '"' {
+		tkzr.readChar()
+	}
+	return tkzr.input[position:tkzr.position]
 }
 
 func (tkzr *Tokenizer) readIdentifier() string {
