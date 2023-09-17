@@ -44,7 +44,6 @@ func (jc *JackCompiler) Compile() {
 
 	for _, subDec := range jc.c.SubroutineDecs {
 		jc.CompileSubroutineDec(subDec)
-
 	}
 
 	fmt.Println(jc.s)
@@ -85,8 +84,19 @@ func (jc *JackCompiler) CompileStatements(stmts []parseTree.Statement) {
 func (jc *JackCompiler) CompileStatement(stmt parseTree.Statement) {
 	switch stmt := stmt.(type) {
 	case *parseTree.LetStatement:
-		jc.CompileExpression(stmt.Expression)
-		jc.w.WritePop(jc.s.KindOf(stmt.Ident.Value), jc.s.IndexOf(stmt.Ident.Value))
+		if stmt.Ident.Indexer == nil {
+			jc.CompileExpression(stmt.Expression)
+			jc.w.WritePop(jc.s.KindOf(stmt.Ident.Value), jc.s.IndexOf(stmt.Ident.Value))
+		} else {
+			jc.w.WritePush(jc.s.KindOf(stmt.Ident.Value), jc.s.IndexOf(stmt.Ident.Value))
+			jc.CompileExpression(stmt.Ident.Indexer)
+			jc.w.WriteArithmetic(token.PLUS)
+			jc.CompileExpression(stmt.Expression)
+			jc.w.WritePop("temp", 0)
+			jc.w.WritePop("pointer", 1)
+			jc.w.WritePush("temp", 0)
+			jc.w.WritePop("that", 0)
+		}
 	case *parseTree.ReturnStatement:
 		if stmt.Expression != nil {
 			jc.CompileExpression(stmt.Expression)
@@ -145,15 +155,22 @@ func (jc *JackCompiler) CompileExpression(exp parseTree.Expression) {
 			jc.w.WriteArithmetic(exp.Operator.Literal)
 		}
 	case *parseTree.Identifier:
+		jc.w.WritePush(jc.s.KindOf(exp.Value), jc.s.IndexOf(exp.Value))
 		if exp.Indexer != nil {
-			// !!!!!!!!!! TODO
-		} else {
-			jc.w.WritePush(jc.s.KindOf(exp.Value), jc.s.IndexOf(exp.Value))
+			jc.CompileExpression(exp.Indexer)
+			jc.w.WriteArithmetic(token.PLUS)
+			jc.w.WritePop("pointer", 1)
+			jc.w.WritePush("that", 0)
 		}
 	case *parseTree.IntegerConstant:
 		jc.w.WritePush("constant", exp.Value)
 	case *parseTree.StringConstant:
-		// !!!!!!!!!!! TODO
+		jc.w.WritePush("constant", len(exp.Value))
+		jc.w.WriteCall("String.new", 1)
+		for _, c := range exp.Value {
+			jc.w.WritePush("constant", int(c))
+			jc.w.WriteCall("String.appendChar", 1)
+		}
 	case *parseTree.KeywordConstant:
 		switch exp.Token.Type {
 		case token.TRUE:
@@ -173,20 +190,12 @@ func (jc *JackCompiler) CompileExpression(exp parseTree.Expression) {
 				for _, e := range exp.ExpList {
 					jc.CompileExpression(e)
 				}
-				if exp.Subroutine.Indexer != nil {
-					// !!!!!!!! TODO
-				} else {
-					jc.w.WriteCall(fmt.Sprintf("%s.%s", jc.s.TypeOf(exp.Ident.Value), exp.Subroutine.Value), len(exp.ExpList)+1)
-				}
+				jc.w.WriteCall(fmt.Sprintf("%s.%s", jc.s.TypeOf(exp.Ident.Value), exp.Subroutine.Value), len(exp.ExpList)+1)
 			} else {
 				for _, e := range exp.ExpList {
 					jc.CompileExpression(e)
 				}
-				if exp.Subroutine.Indexer != nil {
-					// !!!!!!!! TODO
-				} else {
-					jc.w.WriteCall(fmt.Sprintf("%s.%s", exp.Ident.Value, exp.Subroutine.Value), len(exp.ExpList))
-				}
+				jc.w.WriteCall(fmt.Sprintf("%s.%s", exp.Ident.Value, exp.Subroutine.Value), len(exp.ExpList))
 			}
 		} else {
 			for _, e := range exp.ExpList {

@@ -162,6 +162,47 @@ func TestStatement(t *testing.T) {
 			"push constant 1\npush this 0\ncall Point.new 2\npop this 1\n",
 		},
 		{
+			&parseTree.LetStatement{
+				Token: token.Token{Type: token.LET, Literal: token.LET},
+				Ident: &parseTree.Identifier{
+					Token: token.Token{Type: token.IDENT, Literal: "x"},
+					Value: "x",
+					Indexer: &parseTree.IntegerConstant{
+						Token: token.Token{Type: token.INT, Literal: "2"},
+						Value: 2,
+					},
+				},
+				Expression: &parseTree.Infix{
+					Operator: token.Token{Type: token.PLUS, Literal: token.PLUS},
+					Left:     &parseTree.IntegerConstant{Token: token.Token{Type: token.INT, Literal: "5"}, Value: 5},
+					Right:    &parseTree.IntegerConstant{Token: token.Token{Type: token.INT, Literal: "10"}, Value: 10},
+				},
+			},
+			"push this 0\npush constant 2\nadd\npush constant 5\npush constant 10\nadd\npop temp 0\npop pointer 1\npush temp 0\npop that 0\n",
+		},
+		{
+			&parseTree.LetStatement{
+				Token: token.Token{Type: token.LET, Literal: token.LET},
+				Ident: &parseTree.Identifier{
+					Token: token.Token{Type: token.IDENT, Literal: "x"},
+					Value: "x",
+					Indexer: &parseTree.IntegerConstant{
+						Token: token.Token{Type: token.INT, Literal: "2"},
+						Value: 2,
+					},
+				},
+				Expression: &parseTree.Identifier{
+					Token: token.Token{Type: token.IDENT, Literal: "x"},
+					Value: "x",
+					Indexer: &parseTree.IntegerConstant{
+						Token: token.Token{Type: token.INT, Literal: "5"},
+						Value: 5,
+					},
+				},
+			},
+			"push this 0\npush constant 2\nadd\npush this 0\npush constant 5\nadd\npop pointer 1\npush that 0\npop temp 0\npop pointer 1\npush temp 0\npop that 0\n",
+		},
+		{
 			&parseTree.ReturnStatement{
 				Token: token.Token{Type: token.RETURN, Literal: token.RETURN},
 				Expression: &parseTree.Infix{
