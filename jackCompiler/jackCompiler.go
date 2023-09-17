@@ -43,14 +43,14 @@ func (jc *JackCompiler) Compile() {
 	}
 
 	for _, subDec := range jc.c.SubroutineDecs {
-		jc.PopulateSubroutine(subDec)
+		jc.CompileSubroutineDec(subDec)
 
 	}
 
 	fmt.Println(jc.s)
 }
 
-func (jc *JackCompiler) PopulateSubroutine(sd *parseTree.SubroutineDec) {
+func (jc *JackCompiler) CompileSubroutineDec(sd *parseTree.SubroutineDec) {
 	jc.s.Reset()
 	if sd.Kind.Type == token.METHOD {
 		jc.s.Define("this", jc.c.Ident.Value, "argument")
@@ -60,6 +60,25 @@ func (jc *JackCompiler) PopulateSubroutine(sd *parseTree.SubroutineDec) {
 	}
 	for _, varDec := range sd.SubroutineBody.VarDecs {
 		jc.s.Define(varDec.Ident.Token.Literal, varDec.DecType.Literal, "local")
+	}
+
+	jc.w.WriteFunction(fmt.Sprintf("%s.%s", jc.c.Ident.Value, sd.Ident.Value), jc.s.VarCount("local"))
+	switch sd.Kind.Type {
+	case token.CONSTRUCTOR:
+		jc.w.WritePush("constant", jc.s.VarCount("this"))
+		jc.w.WriteCall("Memory.alloc", 1)
+		jc.w.WritePop("pointer", 0)
+	case token.METHOD:
+		jc.w.WritePush("argument", 0)
+		jc.w.WritePop("pointer", 0)
+	}
+
+	jc.CompileStatements(sd.SubroutineBody.Statements)
+}
+
+func (jc *JackCompiler) CompileStatements(stmts []parseTree.Statement) {
+	for _, stmt := range stmts {
+		jc.CompileStatement(stmt)
 	}
 }
 
@@ -77,12 +96,30 @@ func (jc *JackCompiler) CompileStatement(stmt parseTree.Statement) {
 		jc.w.WriteReturn()
 	case *parseTree.DoStatement:
 		jc.CompileExpression(stmt.Expression)
+		jc.w.WritePop("temp", 0)
 	case *parseTree.WhileStatement:
+		jc.w.WriteLabel(fmt.Sprintf("WHILE%d", jc.whileCounter))
 		jc.CompileExpression(stmt.Expression)
-
+		jc.w.WriteArithmetic(token.NOT)
+		jc.w.WriteIf(fmt.Sprintf("BREAK%d", jc.whileCounter))
+		jc.CompileStatements(stmt.Stmts)
+		jc.w.WriteGoto(fmt.Sprintf("WHILE%d", jc.whileCounter))
+		jc.w.WriteLabel(fmt.Sprintf("BREAK%d", jc.whileCounter))
 		jc.whileCounter++
 	case *parseTree.IfStatement:
-
+		elseLen := len(stmt.Else)
+		jc.CompileExpression(stmt.Expression)
+		jc.w.WriteArithmetic(token.NOT)
+		jc.w.WriteIf(fmt.Sprintf("ELSE%d", jc.ifCounter))
+		jc.CompileStatements(stmt.IfStmts)
+		if elseLen > 0 {
+			jc.w.WriteGoto(fmt.Sprintf("IF%d", jc.ifCounter))
+		}
+		jc.w.WriteLabel(fmt.Sprintf("ELSE%d", jc.ifCounter))
+		if elseLen > 0 {
+			jc.CompileStatements(stmt.Else)
+			jc.w.WriteLabel(fmt.Sprintf("IF%d", jc.ifCounter))
+		}
 		jc.ifCounter++
 	}
 }
@@ -120,24 +157,42 @@ func (jc *JackCompiler) CompileExpression(exp parseTree.Expression) {
 	case *parseTree.KeywordConstant:
 		switch exp.Token.Type {
 		case token.TRUE:
-			jc.w.WritePush("constant", -1)
+			jc.w.WritePush("constant", 1)
+			jc.w.WriteArithmetic("neg")
 		case token.FALSE:
+			jc.w.WritePush("constant", 0)
+		case token.NULL:
 			jc.w.WritePush("constant", 0)
 		case token.THIS:
 			jc.w.WritePush("pointer", 0)
 		}
 	case *parseTree.SubroutineCall:
-		for _, e := range exp.ExpList {
-			jc.CompileExpression(e)
-		}
-		if exp.Subroutine.Indexer != nil {
-			// !!!!!!!! TODO
-		} else {
-			if exp.Ident != nil {
-				jc.w.WriteCall(fmt.Sprintf("%s.%s", exp.Ident.Value, exp.Subroutine.Value), len(exp.ExpList))
+		if exp.Ident != nil {
+			if kind := jc.s.KindOf(exp.Ident.Value); kind != "" {
+				jc.w.WritePush(kind, jc.s.IndexOf(exp.Ident.Value))
+				for _, e := range exp.ExpList {
+					jc.CompileExpression(e)
+				}
+				if exp.Subroutine.Indexer != nil {
+					// !!!!!!!! TODO
+				} else {
+					jc.w.WriteCall(fmt.Sprintf("%s.%s", jc.s.TypeOf(exp.Ident.Value), exp.Subroutine.Value), len(exp.ExpList)+1)
+				}
 			} else {
-				jc.w.WriteCall(exp.Subroutine.Value, len(exp.ExpList))
+				for _, e := range exp.ExpList {
+					jc.CompileExpression(e)
+				}
+				if exp.Subroutine.Indexer != nil {
+					// !!!!!!!! TODO
+				} else {
+					jc.w.WriteCall(fmt.Sprintf("%s.%s", exp.Ident.Value, exp.Subroutine.Value), len(exp.ExpList))
+				}
 			}
+		} else {
+			for _, e := range exp.ExpList {
+				jc.CompileExpression(e)
+			}
+			jc.w.WriteCall(fmt.Sprintf("%s.%s", jc.c.Ident.Value, exp.Subroutine.Value), len(exp.ExpList))
 		}
 	}
 }

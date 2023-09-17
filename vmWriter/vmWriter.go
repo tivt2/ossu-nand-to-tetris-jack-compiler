@@ -52,21 +52,20 @@ func (w *VMWriter) WriteArithmetic(command string) {
 	w.Out.WriteString(arithmetic[command] + "\n")
 }
 
-func (w *VMWriter) WriteLabel(label string, iteration int) {
-	w.Out.WriteString(fmt.Sprintf("label %s%d\n", label, iteration))
+func (w *VMWriter) WriteLabel(label string) {
+	w.Out.WriteString(fmt.Sprintf("label %s\n", label))
 }
 
-func (w *VMWriter) WriteGoto(label string, iteration int) {
-	w.Out.WriteString(fmt.Sprintf("goto %s%d\n", label, iteration))
+func (w *VMWriter) WriteGoto(label string) {
+	w.Out.WriteString(fmt.Sprintf("goto %s\n", label))
 }
 
-func (w *VMWriter) WriteIf(label string, iteration int) {
-	w.Out.WriteString(fmt.Sprintf("if-goto %s%d\n", label, iteration))
+func (w *VMWriter) WriteIf(label string) {
+	w.Out.WriteString(fmt.Sprintf("if-goto %s\n", label))
 }
 
 func (w *VMWriter) WriteCall(name string, nArgs int) {
 	w.Out.WriteString(fmt.Sprintf("call %s %d\n", name, nArgs))
-	w.Out.WriteString("pop temp 0\n")
 }
 
 func (w *VMWriter) WriteFunction(name string, nVars int) {

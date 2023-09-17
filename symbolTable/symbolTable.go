@@ -28,8 +28,9 @@ func New() *SymbolTable {
 }
 
 func (sb *SymbolTable) Reset() {
-	sb.fieldCounter = 0
-	sb.staticCounter = 0
+	sb.subroutineLevel = make(map[string]*tableRow)
+	// sb.fieldCounter = 0
+	// sb.staticCounter = 0
 	sb.argumentCounter = 0
 	sb.localCounter = 0
 }
@@ -37,7 +38,7 @@ func (sb *SymbolTable) Reset() {
 func (sb *SymbolTable) Define(name string, decType string, kind string) {
 	switch kind {
 	case "field":
-		sb.classLevel[name] = &tableRow{kind: kind, id: sb.fieldCounter, DecType: decType}
+		sb.classLevel[name] = &tableRow{kind: "this", id: sb.fieldCounter, DecType: decType}
 		sb.fieldCounter++
 	case "static":
 		sb.classLevel[name] = &tableRow{kind: kind, id: sb.staticCounter, DecType: decType}
@@ -57,7 +58,7 @@ func (sb *SymbolTable) VarCount(kind string) int {
 	out := 0
 	var table map[string]*tableRow
 	switch kind {
-	case "field", "static":
+	case "this", "static":
 		table = sb.classLevel
 	case "argument", "local":
 		table = sb.subroutineLevel
@@ -73,23 +74,29 @@ func (sb *SymbolTable) VarCount(kind string) int {
 func (sb *SymbolTable) KindOf(name string) string {
 	if row, ok := sb.classLevel[name]; ok {
 		return row.kind
+	} else if row, ok := sb.subroutineLevel[name]; ok {
+		return row.kind
+	} else {
+		return ""
 	}
-	row := sb.subroutineLevel[name]
-	return row.kind
 }
 
 func (sb *SymbolTable) TypeOf(name string) string {
 	if row, ok := sb.classLevel[name]; ok {
 		return row.DecType
+	} else if row, ok := sb.subroutineLevel[name]; ok {
+		return row.DecType
+	} else {
+		return ""
 	}
-	row := sb.subroutineLevel[name]
-	return row.DecType
 }
 
 func (sb *SymbolTable) IndexOf(name string) int {
 	if row, ok := sb.classLevel[name]; ok {
 		return row.id
+	} else if row, ok := sb.subroutineLevel[name]; ok {
+		return row.id
+	} else {
+		return -1
 	}
-	row := sb.subroutineLevel[name]
-	return row.id
 }
