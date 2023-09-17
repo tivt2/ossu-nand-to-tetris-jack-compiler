@@ -4,7 +4,7 @@ import (
 	"log"
 	"strconv"
 
-	"github.com/tivt2/jack-compiler/parse_tree"
+	"github.com/tivt2/jack-compiler/parseTree"
 	"github.com/tivt2/jack-compiler/token"
 	"github.com/tivt2/jack-compiler/tokenizer"
 )
@@ -48,12 +48,12 @@ func (p *Parser) expectPeek(tokenType token.TokenType) bool {
 	}
 }
 
-func (p *Parser) ParseClass() *parse_tree.Class {
-	class := &parse_tree.Class{Token: p.curToken}
+func (p *Parser) ParseClass() *parseTree.Class {
+	class := &parseTree.Class{Token: p.curToken}
 	if !p.expectToken(token.CLASS) {
 		log.Fatalf("Invalid class keyword, received: %v", p.curToken)
 	}
-	class.Ident = &parse_tree.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	class.Ident = &parseTree.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 	if !p.expectToken(token.IDENT) {
 		log.Fatalf("Invalid class identifier, received: %v", p.curToken)
 	}
@@ -77,8 +77,8 @@ func (p *Parser) ParseClass() *parse_tree.Class {
 	return class
 }
 
-func (p *Parser) parseClassVarDec(cvds []parse_tree.Declaration) []parse_tree.Declaration {
-	cvd := &parse_tree.ClassVarDec{Kind: p.curToken}
+func (p *Parser) parseClassVarDec(cvds []*parseTree.ClassVarDec) []*parseTree.ClassVarDec {
+	cvd := &parseTree.ClassVarDec{Kind: p.curToken}
 	p.nextToken()
 
 	switch p.curToken.Type {
@@ -93,15 +93,15 @@ func (p *Parser) parseClassVarDec(cvds []parse_tree.Declaration) []parse_tree.De
 	if !p.expectPeek(token.IDENT) {
 		log.Fatalf("Invalid class var dec identifier, received: %v", p.peekToken)
 	}
-	cvd.Ident = &parse_tree.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	cvd.Ident = &parseTree.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 	cvds = append(cvds, cvd)
 	p.nextToken()
 	for p.curToken.Type == token.COMMA {
 		p.nextToken()
-		newCvd := &parse_tree.ClassVarDec{
+		newCvd := &parseTree.ClassVarDec{
 			Kind:    cvd.Kind,
 			DecType: cvd.DecType,
-			Ident:   &parse_tree.Identifier{Token: p.curToken, Value: p.curToken.Literal},
+			Ident:   &parseTree.Identifier{Token: p.curToken, Value: p.curToken.Literal},
 		}
 		cvds = append(cvds, newCvd)
 		p.expectPeek(token.COMMA)
@@ -111,8 +111,8 @@ func (p *Parser) parseClassVarDec(cvds []parse_tree.Declaration) []parse_tree.De
 	return cvds
 }
 
-func (p *Parser) parseSubroutineDec() *parse_tree.SubroutineDec {
-	sd := &parse_tree.SubroutineDec{}
+func (p *Parser) parseSubroutineDec() *parseTree.SubroutineDec {
+	sd := &parseTree.SubroutineDec{}
 
 	switch p.curToken.Type {
 	case token.CONSTRUCTOR:
@@ -138,7 +138,7 @@ func (p *Parser) parseSubroutineDec() *parse_tree.SubroutineDec {
 	if !p.expectPeek(token.IDENT) {
 		log.Fatalf("Invalid var dec identifier, received: %v", p.peekToken)
 	}
-	sd.Ident = &parse_tree.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	sd.Ident = &parseTree.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 	if !p.expectPeek(token.LPAREN) {
 		log.Fatalf("Invalid sub dec, missing (, received: %v", p.peekToken)
 	}
@@ -163,8 +163,8 @@ func (p *Parser) parseSubroutineDec() *parse_tree.SubroutineDec {
 	return sd
 }
 
-func (p *Parser) parseParam() *parse_tree.Param {
-	param := &parse_tree.Param{}
+func (p *Parser) parseParam() *parseTree.Param {
+	param := &parseTree.Param{}
 	switch p.curToken.Type {
 	case token.IDENT:
 		param.DecType = p.curToken
@@ -177,16 +177,16 @@ func (p *Parser) parseParam() *parse_tree.Param {
 	if !p.expectPeek(token.IDENT) {
 		log.Fatalf("Invalid var dec identifier, received: %v", p.peekToken)
 	}
-	param.Ident = &parse_tree.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	param.Ident = &parseTree.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 
 	return param
 }
 
-func (p *Parser) parseSubroutineBody() *parse_tree.SubroutineBody {
-	sb := &parse_tree.SubroutineBody{}
+func (p *Parser) parseSubroutineBody() *parseTree.SubroutineBody {
+	sb := &parseTree.SubroutineBody{}
 
 	for p.curToken.Type == token.VAR {
-		sb.VarDecs = append(sb.VarDecs, p.parseVarDec())
+		sb.VarDecs = p.parseVarDec(sb.VarDecs)
 		p.nextToken()
 	}
 
@@ -198,8 +198,8 @@ func (p *Parser) parseSubroutineBody() *parse_tree.SubroutineBody {
 	return sb
 }
 
-func (p *Parser) parseVarDec() parse_tree.Declaration {
-	vd := &parse_tree.VarDec{Token: p.curToken}
+func (p *Parser) parseVarDec(vds []*parseTree.VarDec) []*parseTree.VarDec {
+	vd := &parseTree.VarDec{Kind: p.curToken}
 	p.nextToken()
 
 	switch p.curToken.Type {
@@ -213,16 +213,26 @@ func (p *Parser) parseVarDec() parse_tree.Declaration {
 	if !p.expectPeek(token.IDENT) {
 		log.Fatalf("Invalid var dec identifier, received: %v", p.peekToken)
 	}
-	vd.Ident = &parse_tree.Identifier{Token: p.curToken, Value: p.curToken.Literal}
-	if !p.expectPeek(token.SEMICOLON) {
-		log.Fatalf("Invalid var dec, missing semicolon, received: %v", p.peekToken)
+	vd.Ident = &parseTree.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	vds = append(vds, vd)
+	p.nextToken()
+	for p.curToken.Type == token.COMMA {
+		p.nextToken()
+		newVd := &parseTree.VarDec{
+			Kind:    vd.Kind,
+			DecType: vd.DecType,
+			Ident:   &parseTree.Identifier{Token: p.curToken, Value: p.curToken.Literal},
+		}
+		vds = append(vds, newVd)
+		p.expectPeek(token.COMMA)
+		p.expectPeek(token.SEMICOLON)
 	}
 
-	return vd
+	return vds
 }
 
-func (p *Parser) parseStatements() []parse_tree.Statement {
-	var stmts []parse_tree.Statement
+func (p *Parser) parseStatements() []parseTree.Statement {
+	var stmts []parseTree.Statement
 
 	for p.curToken.Type != token.RBRACE {
 		stmts = append(stmts, p.parseStatement())
@@ -232,7 +242,7 @@ func (p *Parser) parseStatements() []parse_tree.Statement {
 	return stmts
 }
 
-func (p *Parser) parseStatement() parse_tree.Statement {
+func (p *Parser) parseStatement() parseTree.Statement {
 	switch p.curToken.Type {
 	case token.LET:
 		return p.parseLetStatement()
@@ -249,13 +259,13 @@ func (p *Parser) parseStatement() parse_tree.Statement {
 	}
 }
 
-func (p *Parser) parseLetStatement() *parse_tree.LetStatement {
-	ls := &parse_tree.LetStatement{Token: p.curToken}
+func (p *Parser) parseLetStatement() *parseTree.LetStatement {
+	ls := &parseTree.LetStatement{Token: p.curToken}
 	if !p.expectPeek(token.IDENT) {
 		log.Fatalf("Invalid let statement, missing ident, received: %v", p.curToken)
 	}
 
-	ls.Ident = &parse_tree.Identifier{Token: p.curToken, Value: p.curToken.Literal}
+	ls.Ident = &parseTree.Identifier{Token: p.curToken, Value: p.curToken.Literal}
 	if p.expectPeek(token.LBRACKET) {
 		p.nextToken()
 		ls.Ident.Indexer = p.parseExpression()
@@ -275,8 +285,8 @@ func (p *Parser) parseLetStatement() *parse_tree.LetStatement {
 	return ls
 }
 
-func (p *Parser) parseReturnStatement() *parse_tree.ReturnStatement {
-	rs := &parse_tree.ReturnStatement{Token: p.curToken}
+func (p *Parser) parseReturnStatement() *parseTree.ReturnStatement {
+	rs := &parseTree.ReturnStatement{Token: p.curToken}
 
 	p.nextToken()
 	if p.curToken.Type == token.SEMICOLON {
@@ -290,8 +300,8 @@ func (p *Parser) parseReturnStatement() *parse_tree.ReturnStatement {
 	return rs
 }
 
-func (p *Parser) parseDoStatement() *parse_tree.DoStatement {
-	ds := &parse_tree.DoStatement{Token: p.curToken}
+func (p *Parser) parseDoStatement() *parseTree.DoStatement {
+	ds := &parseTree.DoStatement{Token: p.curToken}
 
 	p.nextToken()
 	ds.Expression = p.parseExpression()
@@ -302,8 +312,8 @@ func (p *Parser) parseDoStatement() *parse_tree.DoStatement {
 	return ds
 }
 
-func (p *Parser) parseIfStatement() *parse_tree.IfStatement {
-	is := &parse_tree.IfStatement{Token: p.curToken}
+func (p *Parser) parseIfStatement() *parseTree.IfStatement {
+	is := &parseTree.IfStatement{Token: p.curToken}
 
 	if !p.expectPeek(token.LPAREN) {
 		log.Fatalf("Invalid if statement, missing (, received: %v", p.curToken)
@@ -339,8 +349,8 @@ func (p *Parser) parseIfStatement() *parse_tree.IfStatement {
 	return is
 }
 
-func (p *Parser) parseWhileStatement() *parse_tree.WhileStatement {
-	is := &parse_tree.WhileStatement{Token: p.curToken}
+func (p *Parser) parseWhileStatement() *parseTree.WhileStatement {
+	is := &parseTree.WhileStatement{Token: p.curToken}
 
 	if !p.expectPeek(token.LPAREN) {
 		log.Fatalf("Invalid while statement, missing (, received: %v", p.curToken)
@@ -365,7 +375,7 @@ func (p *Parser) parseWhileStatement() *parse_tree.WhileStatement {
 	return is
 }
 
-func (p *Parser) parseExpression() parse_tree.Expression {
+func (p *Parser) parseExpression() parseTree.Expression {
 	exp := p.parseTerm()
 	for {
 		switch p.peekToken.Type {
@@ -374,14 +384,14 @@ func (p *Parser) parseExpression() parse_tree.Expression {
 			op := p.curToken
 			p.nextToken()
 			exp2 := p.parseTerm()
-			exp = &parse_tree.Infix{Token: op, Operator: op.Literal, Left: exp, Right: exp2}
+			exp = &parseTree.Infix{Operator: op, Left: exp, Right: exp2}
 		default:
 			return exp
 		}
 	}
 }
 
-func (p *Parser) parseTerm() parse_tree.Expression {
+func (p *Parser) parseTerm() parseTree.Expression {
 	switch p.curToken.Type {
 	case token.MINUS, token.NOT:
 		return p.parsePrefix()
@@ -413,19 +423,19 @@ func (p *Parser) parseTerm() parse_tree.Expression {
 				log.Fatalf("Invalid dot call, missing 2nd ident, received: %v", p.curToken)
 			}
 			secondIdent := p.curToken
-			return &parse_tree.SubroutineCall{
-				Ident:      &parse_tree.Identifier{Token: initIdent, Value: initIdent.Literal, Indexer: index},
-				Subroutine: &parse_tree.Identifier{Token: secondIdent, Value: secondIdent.Literal, Indexer: nil},
+			return &parseTree.SubroutineCall{
+				Ident:      &parseTree.Identifier{Token: initIdent, Value: initIdent.Literal, Indexer: index},
+				Subroutine: &parseTree.Identifier{Token: secondIdent, Value: secondIdent.Literal, Indexer: nil},
 				ExpList:    p.parseExpressionList(),
 			}
 		case token.LPAREN:
-			return &parse_tree.SubroutineCall{
+			return &parseTree.SubroutineCall{
 				Ident:      nil,
-				Subroutine: &parse_tree.Identifier{Token: initIdent, Value: initIdent.Literal, Indexer: nil},
+				Subroutine: &parseTree.Identifier{Token: initIdent, Value: initIdent.Literal, Indexer: nil},
 				ExpList:    p.parseExpressionList(),
 			}
 		default:
-			return &parse_tree.Identifier{Token: initIdent, Value: initIdent.Literal, Indexer: index}
+			return &parseTree.Identifier{Token: initIdent, Value: initIdent.Literal, Indexer: index}
 		}
 	default:
 		log.Fatalf("Invalid term received: %v", p.curToken)
@@ -433,7 +443,7 @@ func (p *Parser) parseTerm() parse_tree.Expression {
 	}
 }
 
-func (p *Parser) checkForIndex() parse_tree.Expression {
+func (p *Parser) checkForIndex() parseTree.Expression {
 	if !p.expectPeek(token.LBRACKET) {
 		return nil
 	}
@@ -445,12 +455,12 @@ func (p *Parser) checkForIndex() parse_tree.Expression {
 	return exp
 }
 
-func (p *Parser) parseExpressionList() []parse_tree.Expression {
+func (p *Parser) parseExpressionList() []parseTree.Expression {
 	if !p.expectPeek(token.LPAREN) {
-		return []parse_tree.Expression{}
+		return []parseTree.Expression{}
 	}
 	p.nextToken()
-	list := []parse_tree.Expression{}
+	list := []parseTree.Expression{}
 	for p.curToken.Type != token.RPAREN {
 		p.expectToken(token.COMMA)
 		list = append(list, p.parseExpression())
@@ -460,29 +470,28 @@ func (p *Parser) parseExpressionList() []parse_tree.Expression {
 	return list
 }
 
-func (p *Parser) parsePrefix() parse_tree.Expression {
-	exp := &parse_tree.Prefix{
-		Token:    p.curToken,
-		Operator: p.curToken.Literal,
+func (p *Parser) parsePrefix() parseTree.Expression {
+	exp := &parseTree.Prefix{
+		Operator: p.curToken,
 	}
 	p.nextToken()
 	exp.Expression = p.parseTerm()
 	return exp
 }
 
-func (p *Parser) parseIntegerConstant() parse_tree.Expression {
+func (p *Parser) parseIntegerConstant() parseTree.Expression {
 	val, err := strconv.Atoi(p.curToken.Literal)
 	if err != nil {
 		log.Fatalf("Error while converting %s to integer", p.curToken.Literal)
 	}
 
-	return &parse_tree.IntegerConstant{Token: p.curToken, Value: val}
+	return &parseTree.IntegerConstant{Token: p.curToken, Value: val}
 }
 
-func (p *Parser) parseKeywordConstant() parse_tree.Expression {
-	return &parse_tree.KeywordConstant{Token: p.curToken, Value: p.curToken.Literal}
+func (p *Parser) parseKeywordConstant() parseTree.Expression {
+	return &parseTree.KeywordConstant{Token: p.curToken, Value: p.curToken.Literal}
 }
 
-func (p *Parser) parseStringConstant() parse_tree.Expression {
-	return &parse_tree.StringConstant{Token: p.curToken, Value: p.curToken.Literal}
+func (p *Parser) parseStringConstant() parseTree.Expression {
+	return &parseTree.StringConstant{Token: p.curToken, Value: p.curToken.Literal}
 }

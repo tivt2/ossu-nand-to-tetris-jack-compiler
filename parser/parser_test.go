@@ -118,11 +118,12 @@ func TestParseSubroutineDec(t *testing.T) {
 	}{
 		{
 			`constructor void new(int x, int y) {
-				var boolean t;
+				var boolean t, j;
 				return this;
 			}`,
 			`constructor void new(int x, int y) {
 var boolean t;
+var boolean j;
 return this;
 }`,
 		},

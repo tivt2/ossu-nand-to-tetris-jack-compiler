@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/tivt2/jack-compiler/tokenizer"
+	"github.com/tivt2/jack-compiler/jackCompiler"
 )
 
 func main() {
@@ -16,7 +16,8 @@ func main() {
 	path := os.Args[1]
 
 	if filepath.Ext(path) == ".jack" {
-		tokenizer.New(path)
+		jc := jackCompiler.New(path)
+		jc.Compile()
 		return
 	}
 
@@ -34,7 +35,8 @@ func main() {
 			if filepath.Ext(file) == ".jack" {
 				wg.Add(1)
 				go func() {
-					tokenizer.New(filepath.Join(path, file))
+					jc := jackCompiler.New(filepath.Join(path, file))
+					jc.Compile()
 					wg.Done()
 				}()
 			}

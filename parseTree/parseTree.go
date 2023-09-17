@@ -1,4 +1,4 @@
-package parse_tree
+package parseTree
 
 import (
 	"bytes"
@@ -10,19 +10,13 @@ type Node interface {
 	String() string
 }
 
-type Declaration interface {
-	Node
-	declarationNode()
-}
-
 type Class struct {
 	Token          token.Token
 	Ident          *Identifier
-	ClassVarDecs   []Declaration
-	SubroutineDecs []Declaration
+	ClassVarDecs   []*ClassVarDec
+	SubroutineDecs []*SubroutineDec
 }
 
-func (c *Class) declarationNode() {}
 func (c *Class) String() string {
 	var out bytes.Buffer
 
@@ -46,7 +40,6 @@ type ClassVarDec struct {
 	Ident   *Identifier
 }
 
-func (cvd *ClassVarDec) declarationNode() {}
 func (cvd *ClassVarDec) String() string {
 	var out bytes.Buffer
 
@@ -62,11 +55,10 @@ type SubroutineDec struct {
 	Kind           token.Token
 	DecType        token.Token
 	Ident          *Identifier
-	Params         []Declaration
+	Params         []*Param
 	SubroutineBody *SubroutineBody
 }
 
-func (sd *SubroutineDec) declarationNode() {}
 func (sd *SubroutineDec) String() string {
 	var out bytes.Buffer
 
@@ -93,15 +85,13 @@ type Param struct {
 	Ident   *Identifier
 }
 
-func (p *Param) declarationNode() {}
-func (p *Param) String() string   { return p.DecType.Literal + " " + p.Ident.String() }
+func (p *Param) String() string { return p.DecType.Literal + " " + p.Ident.String() }
 
 type SubroutineBody struct {
-	VarDecs    []Declaration
+	VarDecs    []*VarDec
 	Statements []Statement
 }
 
-func (sb *SubroutineBody) declarationNode() {}
 func (sb *SubroutineBody) String() string {
 	var out bytes.Buffer
 
@@ -116,16 +106,15 @@ func (sb *SubroutineBody) String() string {
 }
 
 type VarDec struct {
-	Token   token.Token
+	Kind    token.Token
 	DecType token.Token
 	Ident   *Identifier
 }
 
-func (vd *VarDec) declarationNode() {}
 func (vd *VarDec) String() string {
 	var out bytes.Buffer
 
-	out.WriteString(vd.Token.Literal + " ")
+	out.WriteString(vd.Kind.Literal + " ")
 	out.WriteString(vd.DecType.Literal + " ")
 	out.WriteString(vd.Ident.String())
 	out.WriteString(";")
@@ -250,17 +239,17 @@ type Expression interface {
 }
 
 type Prefix struct {
-	Token      token.Token
-	Operator   string
+	Operator   token.Token
 	Expression Expression
 }
 
 func (p *Prefix) expNode() {}
+
 func (p *Prefix) String() string {
 	var out bytes.Buffer
 
 	out.WriteString("(")
-	out.WriteString(p.Operator)
+	out.WriteString(p.Operator.Literal)
 	out.WriteString(p.Expression.String())
 	out.WriteString(")")
 
@@ -268,8 +257,7 @@ func (p *Prefix) String() string {
 }
 
 type Infix struct {
-	Token    token.Token
-	Operator string
+	Operator token.Token
 	Left     Expression
 	Right    Expression
 }
@@ -280,7 +268,7 @@ func (i *Infix) String() string {
 
 	out.WriteString("(")
 	out.WriteString(i.Left.String())
-	out.WriteString(" " + i.Operator + " ")
+	out.WriteString(" " + i.Operator.Literal + " ")
 	out.WriteString(i.Right.String())
 	out.WriteString(")")
 

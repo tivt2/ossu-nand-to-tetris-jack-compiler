@@ -1,4 +1,4 @@
-package syntax_analyzer
+package syntaxAnalyzer
 
 import (
 	"fmt"
@@ -7,12 +7,12 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/tivt2/jack-compiler/parse_tree"
+	"github.com/tivt2/jack-compiler/parseTree"
 	"github.com/tivt2/jack-compiler/parser"
 	"github.com/tivt2/jack-compiler/tokenizer"
 )
 
-func ParseTree(filePath string) *parse_tree.Class {
+func ParseTree(filePath string) *parseTree.Class {
 	file, err := os.ReadFile(filePath)
 	checkErr(err, fmt.Sprintf("Error when opening file %s", filePath))
 
@@ -21,9 +21,7 @@ func ParseTree(filePath string) *parse_tree.Class {
 	tkzr := tokenizer.New(fileContent)
 	parser := parser.New(tkzr)
 
-	parseTree := parser.ParseClass()
-
-	return parseTree
+	return parser.ParseClass()
 }
 
 func removeComments(text string) string {
