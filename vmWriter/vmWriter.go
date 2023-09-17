@@ -37,7 +37,7 @@ func New(filePath string) *VMWriter {
 }
 
 func (w *VMWriter) WriteComment(msg string) {
-	w.Out.WriteString(fmt.Sprintf("// %s", msg))
+	w.Out.WriteString(fmt.Sprintf("// %s\n", msg))
 }
 
 func (w *VMWriter) WritePush(segment string, index int) {

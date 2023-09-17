@@ -36,7 +36,7 @@ func New(filePath string) *JackCompiler {
 }
 
 func (jc *JackCompiler) Compile() {
-	jc.w.WriteComment(jc.c.String())
+	jc.w.WriteComment(fmt.Sprintf("class %s", jc.c.Ident.Value))
 
 	for _, dec := range jc.c.ClassVarDecs {
 		jc.s.Define(dec.Ident.Value, dec.DecType.Literal, dec.Kind.Literal)
@@ -46,7 +46,7 @@ func (jc *JackCompiler) Compile() {
 		jc.CompileSubroutineDec(subDec)
 	}
 
-	fmt.Println(jc.s)
+	jc.w.Close()
 }
 
 func (jc *JackCompiler) CompileSubroutineDec(sd *parseTree.SubroutineDec) {
